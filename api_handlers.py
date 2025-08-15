@@ -1,7 +1,7 @@
 from fastapi import HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Any
-import audio_recorder
+from audio_recorder import audio_recorder
 
 
 class DeviceSelection(BaseModel):

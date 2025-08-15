@@ -34,6 +34,7 @@ class AudioRecorder:
             print(f"Audio callback status: {status}")
         self.state.recording_data.append(indata.copy())
 
+
     def get_audio_devices(self):
         """Get list of available audio input devices"""
         devices = sounddevice.query_devices()
@@ -85,64 +86,65 @@ class AudioRecorder:
             "device_info": active_device
         }
 
+
     def start_recording_core(self):
         """Core recording start logic"""
-        if self.state.is_recording:
+        if self.is_recording:
             raise ValueError("Recording already in progress")
         
-        if self.state.active_device_id is None:
+        if self.active_device_id is None:
             raise ValueError("No active device set")
         
         # Check if active device is still available
         devices = self.get_audio_devices()
-        active_device = next((device for device in devices if device['id'] == self.state.active_device_id), None)
+        active_device = next((device for device in devices if device['id'] == self.active_device_id), None)
         
         if active_device is None:
             raise ValueError("Active device is not available")
         
         # Clear previous recording data
-        self.state.recording_data = []
+        self.recording_data = []
         
         # Create and start input stream
-        self.state.recording_stream = sounddevice.InputStream(
-            samplerate=self.state.sample_rate,
+        self.recording_stream = sounddevice.InputStream(
+            samplerate=self.sample_rate,
             channels=2,
             dtype='float32',
-            device=self.state.active_device_id,
+            device=self.active_device_id,
             callback=self.audio_callback
         )
-        self.state.recording_stream.start()
-        self.state.is_recording = True
+        self.recording_stream.start()
+        self.is_recording = True
         
         return {
-            "device_id": self.state.active_device_id,
-            "sample_rate": self.state.sample_rate,
+            "device_id": self.active_device_id,
+            "sample_rate": self.sample_rate,
             "channels": 2,
             "dtype": "float32"
         }
 
     def stop_recording_core(self):
         """Core recording stop logic"""
-        if not self.state.is_recording:
+        if not self.is_recording:
             raise ValueError("No recording in progress")
         
-        if self.state.recording_stream:
-            self.state.recording_stream.stop()
-            self.state.recording_stream.close()
-            self.state.recording_stream = None
+        if self.recording_stream:
+            self.recording_stream.stop()
+            self.recording_stream.close()
+            self.recording_stream = None
         
-        self.state.is_recording = False
+        self.is_recording = False
         
-        if self.state.recording_data:
+        if self.recording_data:
             # Concatenate all recorded chunks
-            full_recording = numpy.concatenate(self.state.recording_data, axis=0)
+            full_recording = numpy.concatenate(self.recording_data, axis=0)
             recorded_samples = len(full_recording)
-            recorded_duration = recorded_samples / self.state.sample_rate
+            recorded_duration = recorded_samples / self.sample_rate
             
             return {
                 "recorded_samples": int(recorded_samples),
                 "recorded_duration": float(recorded_duration),
-                "sample_rate": self.state.sample_rate,
+                "sample_rate": self.sample_rate,
                 "channels": 2,
                 "dtype": "float32"
             }
@@ -151,14 +153,14 @@ class AudioRecorder:
 
     def save_recording_core(self, file_path: str):
         """Core recording save logic"""
-        if self.state.is_recording:
+        if self.is_recording:
             raise ValueError("Recording is still in progress. Stop recording first.")
         
-        if not self.state.recording_data:
+        if not self.recording_data:
             raise ValueError("No recording data available to save")
         
         # Concatenate all recorded chunks
-        full_recording = numpy.concatenate(self.state.recording_data, axis=0)
+        full_recording = numpy.concatenate(self.recording_data, axis=0)
         
         # Ensure directory exists
         directory = os.path.dirname(file_path)
@@ -170,7 +172,7 @@ class AudioRecorder:
             # WAV file parameters
             channels = 2
             sample_width = 4  # 32-bit float
-            frame_rate = self.state.sample_rate
+            frame_rate = self.sample_rate
             num_frames = len(full_recording)
             
             # Calculate file sizes
@@ -198,27 +200,27 @@ class AudioRecorder:
             f.write(full_recording.tobytes())
         
         file_size = os.path.getsize(file_path)
-        recorded_duration = len(full_recording) / self.state.sample_rate
+        recorded_duration = len(full_recording) / self.sample_rate
         
         return {
             "file_path": file_path,
             "file_size_bytes": int(file_size),
             "recorded_duration": float(recorded_duration),
-            "sample_rate": int(self.state.sample_rate),
+            "sample_rate": int(self.sample_rate),
             "channels": 2,
             "format": "WAV 32-bit float"
         }
 
     def normalize_recording_core(self, target_db: float = 0.0):
         """Normalize recording data to specified dB level"""
-        if self.state.is_recording:
+        if self.is_recording:
             raise ValueError("Recording is still in progress. Stop recording first.")
         
-        if not self.state.recording_data:
+        if not self.recording_data:
             raise ValueError("No recording data available to normalize")
         
         # Concatenate all recorded chunks
-        full_recording = numpy.concatenate(self.state.recording_data, axis=0)
+        full_recording = numpy.concatenate(self.recording_data, axis=0)
         
         # Find the maximum absolute value across all channels
         max_amplitude = numpy.max(numpy.abs(full_recording))
@@ -237,7 +239,7 @@ class AudioRecorder:
         normalized_recording = full_recording * normalization_factor
         
         # Replace recording data with normalized version
-        self.state.recording_data = [normalized_recording]
+        self.recording_data = [normalized_recording]
         
         # Calculate original peak in dB
         original_peak_db = 20.0 * numpy.log10(max_amplitude) if max_amplitude > 0 else -numpy.inf
@@ -253,20 +255,20 @@ class AudioRecorder:
             "new_peak": float(new_peak),
             "new_peak_db": float(new_peak_db),
             "recorded_samples": int(len(normalized_recording)),
-            "recorded_duration": float(len(normalized_recording) / self.state.sample_rate)
+            "recorded_duration": float(len(normalized_recording) / self.sample_rate)
         }
 
     def learn_noise_floor_core(self):
         """Learn noise floor by recording 5 seconds of silence"""
-        if self.state.is_recording:
+        if self.is_recording:
             raise ValueError("Recording already in progress")
         
-        if self.state.active_device_id is None:
+        if self.active_device_id is None:
             raise ValueError("No active device set")
         
         # Check if active device is still available
         devices = self.get_audio_devices()
-        active_device = next((device for device in devices if device['id'] == self.state.active_device_id), None)
+        active_device = next((device for device in devices if device['id'] == self.active_device_id), None)
         
         if active_device is None:
             raise ValueError("Active device is not available")
@@ -274,42 +276,42 @@ class AudioRecorder:
         # Record 5 seconds of silence
         silence_duration = 5.0
         silence_data = sounddevice.rec(
-            int(silence_duration * self.state.sample_rate),
-            samplerate=self.state.sample_rate,
+            int(silence_duration * self.sample_rate),
+            samplerate=self.sample_rate,
             channels=2,
             dtype='float32',
-            device=self.state.active_device_id
+            device=self.active_device_id
         )
         sounddevice.wait()
         
         # Calculate RMS noise floor
         rms_noise = numpy.sqrt(numpy.mean(silence_data ** 2))
-        self.state.noise_floor = rms_noise * 2.0  # Add some margin for detection
+        self.noise_floor = rms_noise * 2.0  # Add some margin for detection
         
         return {
             "message": "Noise floor learned",
             "noise_floor_rms": float(rms_noise),
-            "noise_floor_threshold": float(self.state.noise_floor),
+            "noise_floor_threshold": float(self.noise_floor),
             "recorded_duration": float(silence_duration),
-            "sample_rate": int(self.state.sample_rate)
+            "sample_rate": int(self.sample_rate)
         }
 
     def trim_silence_core(self, margin_seconds: float = 0.1):
         """Trim silence from beginning and end of recording"""
-        if self.state.is_recording:
+        if self.is_recording:
             raise ValueError("Recording is still in progress. Stop recording first.")
         
-        if not self.state.recording_data:
+        if not self.recording_data:
             raise ValueError("No recording data available to trim")
         
-        if self.state.noise_floor is None:
+        if self.noise_floor is None:
             raise ValueError("Noise floor not learned. Use learn_noise_floor endpoint first.")
         
         # Concatenate all recorded chunks
-        full_recording = numpy.concatenate(self.state.recording_data, axis=0)
+        full_recording = numpy.concatenate(self.recording_data, axis=0)
         
         # Calculate RMS in small windows
-        window_size = int(0.01 * self.state.sample_rate)  # 10ms windows
+        window_size = int(0.01 * self.sample_rate)  # 10ms windows
         num_windows = len(full_recording) // window_size
         
         rms_values = []
@@ -323,7 +325,7 @@ class AudioRecorder:
         rms_values = numpy.array(rms_values)
         
         # Find first and last non-silent windows
-        non_silent = rms_values > self.state.noise_floor
+        non_silent = rms_values > self.noise_floor
         
         if not numpy.any(non_silent):
             raise ValueError("Entire recording is below noise floor")
@@ -332,19 +334,19 @@ class AudioRecorder:
         last_sound = len(non_silent) - 1 - numpy.argmax(non_silent[::-1])
         
         # Convert to sample indices
-        start_sample = max(0, first_sound * window_size - int(margin_seconds * self.state.sample_rate))
-        end_sample = min(len(full_recording), (last_sound + 1) * window_size + int(margin_seconds * self.state.sample_rate))
+        start_sample = max(0, first_sound * window_size - int(margin_seconds * self.sample_rate))
+        end_sample = min(len(full_recording), (last_sound + 1) * window_size + int(margin_seconds * self.sample_rate))
         
         # Trim the recording
         trimmed_recording = full_recording[start_sample:end_sample]
         
         # Replace recording data with trimmed version
-        self.state.recording_data = [trimmed_recording]
+        self.recording_data = [trimmed_recording]
         
-        original_duration = len(full_recording) / self.state.sample_rate
-        trimmed_duration = len(trimmed_recording) / self.state.sample_rate
-        trimmed_start_time = start_sample / self.state.sample_rate
-        trimmed_end_time = end_sample / self.state.sample_rate
+        original_duration = len(full_recording) / self.sample_rate
+        trimmed_duration = len(trimmed_recording) / self.sample_rate
+        trimmed_start_time = start_sample / self.sample_rate
+        trimmed_end_time = end_sample / self.sample_rate
         
         return {
             "message": "Silence trimmed",
@@ -353,12 +355,11 @@ class AudioRecorder:
             "trimmed_start_time": float(trimmed_start_time),
             "trimmed_end_time": float(trimmed_end_time),
             "margin_seconds": float(margin_seconds),
-            "noise_floor_threshold": float(self.state.noise_floor),
+            "noise_floor_threshold": float(self.noise_floor),
             "samples_removed_start": int(start_sample),
             "samples_removed_end": int(len(full_recording) - end_sample)
         }
 
 
-# Create instances with dependency injection
-audio_recording_state = AudioRecordingState()
-audio_recorder = AudioRecorder(audio_recording_state)
+# Global instance
+audio_recorder = AudioRecorder()
