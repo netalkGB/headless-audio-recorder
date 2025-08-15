@@ -10,3 +10,16 @@ dependencies = [
     "sounddevice>=0.5.2",
     "uvicorn>=0.35.0",
 ]
+
+[dependency-groups]
+dev = [
+    "nuitka>=2.7.12",
+]
+
+[project.scripts]
+audio-recorder = "main:main"
+
+[tool.uv]
+dev-dependencies = [
+    "nuitka>=2.7.12",
+]
