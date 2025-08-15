@@ -14,6 +14,9 @@ sample_rate: int = 44100
 # Active recording device
 active_device_id: Optional[int] = None
 
+# Noise floor for silence detection
+noise_floor: Optional[float] = None
+
 
 def audio_callback(indata, frames, time, status):
     """Callback function for audio recording"""
@@ -139,14 +142,14 @@ def stop_recording_core():
         recorded_duration = recorded_samples / sample_rate
         
         return {
-            "recorded_samples": recorded_samples,
-            "recorded_duration": recorded_duration,
+            "recorded_samples": int(recorded_samples),
+            "recorded_duration": float(recorded_duration),
             "sample_rate": sample_rate,
             "channels": 2,
             "dtype": "float32"
         }
     else:
-        return {"recorded_samples": 0, "recorded_duration": 0}
+        return {"recorded_samples": 0, "recorded_duration": 0.0}
 
 
 def save_recording_core(file_path: str):
@@ -204,9 +207,9 @@ def save_recording_core(file_path: str):
     
     return {
         "file_path": file_path,
-        "file_size_bytes": file_size,
-        "recorded_duration": recorded_duration,
-        "sample_rate": sample_rate,
+        "file_size_bytes": int(file_size),
+        "recorded_duration": float(recorded_duration),
+        "sample_rate": int(sample_rate),
         "channels": 2,
         "format": "WAV 32-bit float"
     }
@@ -257,6 +260,114 @@ def normalize_recording_core(target_db: float = 0.0):
         "normalization_factor": float(normalization_factor),
         "new_peak": float(new_peak),
         "new_peak_db": float(new_peak_db),
-        "recorded_samples": len(normalized_recording),
-        "recorded_duration": len(normalized_recording) / sample_rate
+        "recorded_samples": int(len(normalized_recording)),
+        "recorded_duration": float(len(normalized_recording) / sample_rate)
+    }
+
+
+def learn_noise_floor_core():
+    """Learn noise floor by recording 5 seconds of silence"""
+    global is_recording, recording_data, recording_stream, active_device_id, noise_floor
+    
+    if is_recording:
+        raise ValueError("Recording already in progress")
+    
+    if active_device_id is None:
+        raise ValueError("No active device set")
+    
+    # Check if active device is still available
+    devices = get_audio_devices()
+    active_device = next((device for device in devices if device['id'] == active_device_id), None)
+    
+    if active_device is None:
+        raise ValueError("Active device is not available")
+    
+    # Record 5 seconds of silence
+    silence_duration = 5.0
+    silence_data = sounddevice.rec(
+        int(silence_duration * sample_rate),
+        samplerate=sample_rate,
+        channels=2,
+        dtype='float32',
+        device=active_device_id
+    )
+    sounddevice.wait()
+    
+    # Calculate RMS noise floor
+    rms_noise = numpy.sqrt(numpy.mean(silence_data ** 2))
+    noise_floor = rms_noise * 2.0  # Add some margin for detection
+    
+    return {
+        "message": "Noise floor learned",
+        "noise_floor_rms": float(rms_noise),
+        "noise_floor_threshold": float(noise_floor),
+        "recorded_duration": float(silence_duration),
+        "sample_rate": int(sample_rate)
+    }
+
+
+def trim_silence_core(margin_seconds: float = 0.1):
+    """Trim silence from beginning and end of recording"""
+    global recording_data, noise_floor
+    
+    if is_recording:
+        raise ValueError("Recording is still in progress. Stop recording first.")
+    
+    if not recording_data:
+        raise ValueError("No recording data available to trim")
+    
+    if noise_floor is None:
+        raise ValueError("Noise floor not learned. Use learn_noise_floor endpoint first.")
+    
+    # Concatenate all recorded chunks
+    full_recording = numpy.concatenate(recording_data, axis=0)
+    
+    # Calculate RMS in small windows
+    window_size = int(0.01 * sample_rate)  # 10ms windows
+    num_windows = len(full_recording) // window_size
+    
+    rms_values = []
+    for i in range(num_windows):
+        start = i * window_size
+        end = start + window_size
+        window_data = full_recording[start:end]
+        rms = numpy.sqrt(numpy.mean(window_data ** 2))
+        rms_values.append(rms)
+    
+    rms_values = numpy.array(rms_values)
+    
+    # Find first and last non-silent windows
+    non_silent = rms_values > noise_floor
+    
+    if not numpy.any(non_silent):
+        raise ValueError("Entire recording is below noise floor")
+    
+    first_sound = numpy.argmax(non_silent)
+    last_sound = len(non_silent) - 1 - numpy.argmax(non_silent[::-1])
+    
+    # Convert to sample indices
+    start_sample = max(0, first_sound * window_size - int(margin_seconds * sample_rate))
+    end_sample = min(len(full_recording), (last_sound + 1) * window_size + int(margin_seconds * sample_rate))
+    
+    # Trim the recording
+    trimmed_recording = full_recording[start_sample:end_sample]
+    
+    # Replace recording data with trimmed version
+    recording_data = [trimmed_recording]
+    
+    original_duration = len(full_recording) / sample_rate
+    trimmed_duration = len(trimmed_recording) / sample_rate
+    trimmed_start_time = start_sample / sample_rate
+    trimmed_end_time = end_sample / sample_rate
+    
+    return {
+        "message": "Silence trimmed",
+        "original_duration": float(original_duration),
+        "trimmed_duration": float(trimmed_duration),
+        "trimmed_start_time": float(trimmed_start_time),
+        "trimmed_end_time": float(trimmed_end_time),
+        "margin_seconds": float(margin_seconds),
+        "noise_floor_threshold": float(noise_floor),
+        "samples_removed_start": int(start_sample),
+        "samples_removed_end": int(len(full_recording) - end_sample)
     }

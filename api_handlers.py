@@ -16,6 +16,10 @@ class NormalizeRequest(BaseModel):
     target_db: float = 0.0
 
 
+class TrimSilenceRequest(BaseModel):
+    margin_seconds: float = 0.1
+
+
 async def get_recording_devices():
     """Get list of available recording devices"""
     return audio_recorder.get_audio_devices()
@@ -104,3 +108,31 @@ async def normalize_recording(normalize_request: NormalizeRequest):
             raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to normalize recording: {str(e)}")
+
+
+async def learn_noise_floor():
+    """Learn noise floor by recording 5 seconds of silence"""
+    try:
+        result = audio_recorder.learn_noise_floor_core()
+        return result
+    except ValueError as e:
+        if "already in progress" in str(e):
+            raise HTTPException(status_code=409, detail=str(e))
+        else:
+            raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to learn noise floor: {str(e)}")
+
+
+async def trim_silence(trim_request: TrimSilenceRequest):
+    """Trim silence from beginning and end of recording"""
+    try:
+        result = audio_recorder.trim_silence_core(trim_request.margin_seconds)
+        return result
+    except ValueError as e:
+        if "still in progress" in str(e):
+            raise HTTPException(status_code=409, detail=str(e))
+        else:
+            raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to trim silence: {str(e)}")

@@ -36,10 +36,21 @@ async def save_recording(save_request: api_handlers.SaveRequest):
     """Save recorded audio to specified file path"""
     return await api_handlers.save_recording(save_request)
 
-@app.post("/api/v1/record/normalize")
+# Audio editing endpoints
+@app.post("/api/v1/record/edit/normalize")
 async def normalize_recording(normalize_request: api_handlers.NormalizeRequest):
     """Normalize recorded audio to specified dB level"""
     return await api_handlers.normalize_recording(normalize_request)
+
+@app.post("/api/v1/record/edit/trim-silence/learn")
+async def learn_noise_floor():
+    """Learn noise floor by recording 5 seconds of silence"""
+    return await api_handlers.learn_noise_floor()
+
+@app.post("/api/v1/record/edit/trim-silence")
+async def trim_silence(trim_request: api_handlers.TrimSilenceRequest):
+    """Trim silence from beginning and end of recording"""
+    return await api_handlers.trim_silence(trim_request)
 
 
 def main():

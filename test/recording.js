@@ -111,7 +111,7 @@ function testSaveRecording(filePath) {
 }
 
 function testNormalizeRecording(targetDb = 0.0) {
-    fetch('http://localhost:8000/api/v1/record/normalize', {
+    fetch('http://localhost:8000/api/v1/record/edit/normalize', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -129,5 +129,45 @@ function testNormalizeRecording(targetDb = 0.0) {
     })
     .catch(error => {
         console.error('Error normalizing recording:', error);
+    });
+}
+
+function testLearnNoiseFloor() {
+    fetch('http://localhost:8000/api/v1/record/edit/trim-silence/learn', {
+        method: 'POST'
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Learn noise floor response:', data);
+    })
+    .catch(error => {
+        console.error('Error learning noise floor:', error);
+    });
+}
+
+function testTrimSilence(marginSeconds = 0.1) {
+    fetch('http://localhost:8000/api/v1/record/edit/trim-silence', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ margin_seconds: marginSeconds })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Trim silence response:', data);
+    })
+    .catch(error => {
+        console.error('Error trimming silence:', error);
     });
 }
