@@ -12,6 +12,10 @@ class SaveRequest(BaseModel):
     file_path: str
 
 
+class NormalizeRequest(BaseModel):
+    target_db: float = 0.0
+
+
 async def get_recording_devices():
     """Get list of available recording devices"""
     return audio_recorder.get_audio_devices()
@@ -86,3 +90,17 @@ async def save_recording(save_request: SaveRequest):
             raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save recording: {str(e)}")
+
+
+async def normalize_recording(normalize_request: NormalizeRequest):
+    """Normalize recorded audio to specified dB level"""
+    try:
+        result = audio_recorder.normalize_recording_core(normalize_request.target_db)
+        return result
+    except ValueError as e:
+        if "still in progress" in str(e):
+            raise HTTPException(status_code=409, detail=str(e))
+        else:
+            raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to normalize recording: {str(e)}")

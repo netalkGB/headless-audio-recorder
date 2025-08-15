@@ -210,3 +210,53 @@ def save_recording_core(file_path: str):
         "channels": 2,
         "format": "WAV 32-bit float"
     }
+
+
+def normalize_recording_core(target_db: float = 0.0):
+    """Normalize recording data to specified dB level"""
+    global recording_data
+    
+    if is_recording:
+        raise ValueError("Recording is still in progress. Stop recording first.")
+    
+    if not recording_data:
+        raise ValueError("No recording data available to normalize")
+    
+    # Concatenate all recorded chunks
+    full_recording = numpy.concatenate(recording_data, axis=0)
+    
+    # Find the maximum absolute value across all channels
+    max_amplitude = numpy.max(numpy.abs(full_recording))
+    
+    if max_amplitude == 0:
+        raise ValueError("Recording contains only silence, cannot normalize")
+    
+    # Convert target dB to linear amplitude
+    # 0 dB = 1.0, -6 dB = 0.5, -12 dB = 0.25, etc.
+    target_amplitude = 10.0 ** (target_db / 20.0)
+    
+    # Calculate normalization factor
+    normalization_factor = target_amplitude / max_amplitude
+    
+    # Apply normalization
+    normalized_recording = full_recording * normalization_factor
+    
+    # Replace recording data with normalized version
+    recording_data = [normalized_recording]
+    
+    # Calculate original peak in dB
+    original_peak_db = 20.0 * numpy.log10(max_amplitude) if max_amplitude > 0 else -numpy.inf
+    new_peak = numpy.max(numpy.abs(normalized_recording))
+    new_peak_db = 20.0 * numpy.log10(new_peak) if new_peak > 0 else -numpy.inf
+    
+    return {
+        "message": "Recording normalized",
+        "target_db": target_db,
+        "original_peak": float(max_amplitude),
+        "original_peak_db": float(original_peak_db),
+        "normalization_factor": float(normalization_factor),
+        "new_peak": float(new_peak),
+        "new_peak_db": float(new_peak_db),
+        "recorded_samples": len(normalized_recording),
+        "recorded_duration": len(normalized_recording) / sample_rate
+    }

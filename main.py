@@ -36,6 +36,11 @@ async def save_recording(save_request: api_handlers.SaveRequest):
     """Save recorded audio to specified file path"""
     return await api_handlers.save_recording(save_request)
 
+@app.post("/api/v1/record/normalize")
+async def normalize_recording(normalize_request: api_handlers.NormalizeRequest):
+    """Normalize recorded audio to specified dB level"""
+    return await api_handlers.normalize_recording(normalize_request)
+
 
 def main():
     print("Audio Recorder API Server")
