@@ -112,11 +112,30 @@ async def start_recording():
         # Clear previous recording data
         recording_data = []
         
+        # Check supported formats and use the best available
+        try:
+            # Try float32 first
+            sounddevice.check_input_settings(device=active_device_id, channels=2, dtype='float32', samplerate=sample_rate)
+            dtype_to_use = 'float32'
+        except:
+            try:
+                # Try int32 (24-bit in 32-bit container)
+                sounddevice.check_input_settings(device=active_device_id, channels=2, dtype='int32', samplerate=sample_rate)
+                dtype_to_use = 'int32'
+            except:
+                try:
+                    # Try int16
+                    sounddevice.check_input_settings(device=active_device_id, channels=2, dtype='int16', samplerate=sample_rate)
+                    dtype_to_use = 'int16'
+                except:
+                    # Final fallback to int16 (most widely supported)
+                    dtype_to_use = 'int16'
+        
         # Create and start input stream
         recording_stream = sounddevice.InputStream(
             samplerate=sample_rate,
             channels=2,
-            dtype='float32',
+            dtype=dtype_to_use,
             device=active_device_id,
             callback=audio_callback
         )
@@ -128,7 +147,7 @@ async def start_recording():
             "device_id": active_device_id,
             "sample_rate": sample_rate,
             "channels": 2,
-            "dtype": "float32"
+            "dtype": dtype_to_use
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to start recording: {str(e)}")
