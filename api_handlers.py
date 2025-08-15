@@ -136,3 +136,17 @@ async def trim_silence(trim_request: TrimSilenceRequest):
             raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to trim silence: {str(e)}")
+
+
+async def analyze_clipping():
+    """Check if recording has clipping"""
+    try:
+        result = audio_recorder.analyze_clipping_core()
+        return result
+    except ValueError as e:
+        if "still in progress" in str(e):
+            raise HTTPException(status_code=409, detail=str(e))
+        else:
+            raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to analyze clipping: {str(e)}")

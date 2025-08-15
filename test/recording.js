@@ -171,3 +171,19 @@ function testTrimSilence(marginSeconds = 0.1) {
         console.error('Error trimming silence:', error);
     });
 }
+
+function testAnalyzeClipping() {
+    fetch('http://localhost:8000/api/v1/record/analyze/clipping')
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Clipping analysis response:', data);
+    })
+    .catch(error => {
+        console.error('Error analyzing clipping:', error);
+    });
+}

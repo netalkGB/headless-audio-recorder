@@ -358,6 +358,23 @@ class AudioRecorder:
             "samples_removed_end": int(len(full_recording) - end_sample)
         }
 
+    def analyze_clipping_core(self):
+        """Check if recording has clipping (peaks at 0dB)"""
+        if self.state.is_recording:
+            raise ValueError("Recording is still in progress. Stop recording first.")
+        
+        if not self.state.recording_data:
+            raise ValueError("No recording data available to analyze")
+        
+        # Concatenate all recorded chunks
+        full_recording = numpy.concatenate(self.state.recording_data, axis=0)
+        
+        # Check for clipping (values at or very close to 1.0/-1.0)
+        clipping_threshold = 0.99
+        has_clipping = numpy.any(numpy.abs(full_recording) >= clipping_threshold)
+        
+        return {"has_clipping": bool(has_clipping)}
+
 
 # Create instances with dependency injection
 audio_recording_state = AudioRecordingState()

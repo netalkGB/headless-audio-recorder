@@ -52,6 +52,12 @@ async def trim_silence(trim_request: api_handlers.TrimSilenceRequest):
     """Trim silence from beginning and end of recording"""
     return await api_handlers.trim_silence(trim_request)
 
+# Audio analysis endpoints
+@app.get("/api/v1/record/analyze/clipping")
+async def analyze_clipping():
+    """Check if recording has clipping (peaks at 0dB)"""
+    return await api_handlers.analyze_clipping()
+
 
 def main():
     import uvicorn
