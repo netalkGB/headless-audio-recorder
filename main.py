@@ -54,8 +54,14 @@ async def trim_silence(trim_request: api_handlers.TrimSilenceRequest):
 
 
 def main():
-    print("Audio Recorder API Server")
-    print("Use: uvicorn main:app --reload")
+    import uvicorn
+    import argparse
+    parser = argparse.ArgumentParser(description="Audio Recorder API server.")
+    parser.add_argument("--host", type=str, default="0.0.0.0", help="Host to bind the server to")
+    parser.add_argument("--port", type=int, default=8000, help="Port to bind the server to")
+    args = parser.parse_args()
+
+    uvicorn.run(app, host=args.host, port=args.port)
 
 
 if __name__ == "__main__":
