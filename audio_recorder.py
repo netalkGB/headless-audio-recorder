@@ -88,7 +88,12 @@ class AudioRecorder:
     def start_recording_core(self):
         """Core recording start logic"""
         if self.state.is_recording:
-            raise ValueError("Recording already in progress")
+            # Stop existing recording and reset state
+            if self.state.recording_stream:
+                self.state.recording_stream.stop()
+                self.state.recording_stream.close()
+                self.state.recording_stream = None
+            self.state.is_recording = False
         
         if self.state.active_device_id is None:
             raise ValueError("No active device set")
